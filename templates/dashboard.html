@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — FaceAttend{% endblock %}
 {% block content %}
-<div class="page-title">Dashboard — {{ date }}</div>
+<div class="page-header">
+  <div>
+    <div class="page-title">Dashboard</div>
+    <div class="page-subtitle">{{ date }}</div>
+  </div>
+  <a href="/attendance" class="btn btn-primary btn-lg">Start Attendance</a>
+</div>
+
 <div class="stat-grid">
   <div class="stat-card">
     <div class="num">{{ total_students }}</div>
@@ -12,12 +19,12 @@
     <div class="label">Present Today</div>
   </div>
   <div class="stat-card">
-    <div class="num" style="color:#e74c3c">{{ total_students - total_present }}</div>
+    <div class="num" style="color:#fc8181">{{ total_students - total_present }}</div>
     <div class="label">Absent Today</div>
   </div>
   <div class="stat-card">
-    <div class="num" style="color:#f39c12">
-      {% if total_students > 0 %}{{ ((total_present / total_students) * 100)|int }}%{% else %}0%{% endif %}
+    <div class="num" style="color:#f6ad55">
+      {% if total_students > 0 %}{{ ((total_present/total_students)*100)|int }}%{% else %}0%{% endif %}
     </div>
     <div class="label">Attendance Rate</div>
   </div>
@@ -27,34 +34,32 @@
   <div class="card">
     <div class="card-title">Today's Attendance</div>
     {% if today_records %}
+    <div class="table-wrap">
     <table>
       <thead><tr><th>Name</th><th>ID</th><th>Time</th><th>Status</th></tr></thead>
       <tbody>
         {% for r in today_records %}
         <tr>
-          <td>{{ r.name }}</td>
-          <td>{{ r.student_id }}</td>
-          <td>{{ r.time }}</td>
-          <td><span class="badge badge-green">{{ r.status }}</span></td>
+          <td><strong>{{ r.name }}</strong></td>
+          <td><span class="badge badge-blue">{{ r.student_id }}</span></td>
+          <td style="color:var(--text-muted)">{{ r.time }}</td>
+          <td><span class="badge badge-green">&#10003; {{ r.status }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <p style="color:#aaa;text-align:center;padding:2rem">No attendance marked yet today.</p>
+    <div class="empty-state">
+      <p>No attendance marked yet today.<br>Go to Attendance to start a session.</p>
+    </div>
     {% endif %}
   </div>
 
   <div class="card">
     <div class="card-title">Attendance Overview</div>
-    <canvas id="chart" height="220"></canvas>
+    <canvas id="chart" height="240"></canvas>
   </div>
-</div>
-
-<div style="text-align:center;margin-top:1rem">
-  <a href="/attendance" class="btn btn-primary" style="font-size:16px;padding:12px 32px">
-    Start Attendance Session
-  </a>
 </div>
 {% endblock %}
 {% block scripts %}
@@ -69,16 +74,20 @@ new Chart(document.getElementById('chart'), {
     datasets:[{
       label:'Days Present',
       data,
-      backgroundColor:'rgba(78,204,163,.7)',
-      borderColor:'#4ecca3',
-      borderWidth:1,
-      borderRadius:6
+      backgroundColor:'rgba(78,204,163,.75)',
+      borderColor:'#38b28e',
+      borderWidth:0,
+      borderRadius:8,
+      borderSkipped:false
     }]
   },
   options:{
     responsive:true,
     plugins:{legend:{display:false}},
-    scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}
+    scales:{
+      y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#f0f0f0'}},
+      x:{grid:{display:false}}
+    }
   }
 });
 </script>

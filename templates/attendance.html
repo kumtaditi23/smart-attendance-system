@@ -1,43 +1,45 @@
 {% extends "base.html" %}
 {% block title %}Take Attendance — FaceAttend{% endblock %}
-{% block extra_css %}
-<style>
-.cam-wrap{display:grid;grid-template-columns:2fr 1fr;gap:1.5rem}
-#video-box{background:#000;border-radius:12px;overflow:hidden;min-height:400px;display:flex;align-items:center;justify-content:center;position:relative}
-#video-feed{width:100%;display:none;border-radius:12px}
-#cam-placeholder{color:#555;text-align:center;padding:3rem}
-#cam-placeholder p{margin-top:1rem;font-size:14px}
-.controls{display:flex;gap:1rem;margin-bottom:1rem}
-#live-list{list-style:none;max-height:380px;overflow-y:auto}
-#live-list li{padding:10px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:8px;font-size:14px;display:flex;align-items:center;gap:8px;animation:fadeIn .3s}
-#live-list li .dot{width:10px;height:10px;border-radius:50%;background:#4ecca3;flex-shrink:0}
-@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-.status-bar{background:#1a1a2e;color:#4ecca3;padding:10px 16px;border-radius:8px;font-size:13px;font-family:monospace;margin-bottom:1rem}
-</style>
-{% endblock %}
 {% block content %}
-<div class="page-title">Take Attendance</div>
-<div class="status-bar" id="status-bar">Camera is off — click Start to begin</div>
+<div class="page-header">
+  <div>
+    <div class="page-title">Take Attendance</div>
+    <div class="page-subtitle">Face recognition with blink detection</div>
+  </div>
+  <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<div id="status-pill" class="status-pill">
+  <span class="dot"></span>
+  <span id="status-text">Camera is off — click Start to begin</span>
+</div>
+
 <div class="cam-wrap">
   <div>
-    <div class="controls">
-      <button class="btn btn-primary" id="btn-start" onclick="startCamera()">Start Camera</button>
-      <button class="btn btn-danger"  id="btn-stop"  onclick="stopCamera()" style="display:none">Stop Camera</button>
-      <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    <div class="cam-controls">
+      <button class="btn btn-primary btn-lg" id="btn-start" onclick="startCamera()">Start Camera</button>
+      <button class="btn btn-danger btn-lg" id="btn-stop" onclick="stopCamera()" style="display:none">Stop Camera</button>
     </div>
-    <div id="video-box">
+    <div class="cam-feed-box" id="cam-box">
       <img id="video-feed" src="/video_feed" alt="Live feed">
-      <div id="cam-placeholder">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-        <p>Click "Start Camera" to begin face recognition</p>
+      <div class="cam-placeholder" id="cam-placeholder">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+        </svg>
+        <p>Click <strong>Start Camera</strong> to begin<br>face recognition with blink detection</p>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">Marked Present <span id="count-badge" class="badge badge-green">0</span></div>
+  <div class="card" style="margin-bottom:0">
+    <div class="card-title">
+      Present Today
+      <span class="badge badge-green" id="count-badge" style="margin-left:auto">0</span>
+    </div>
     <ul id="live-list">
-      <li style="color:#aaa;background:none;font-size:13px">Waiting for session to start...</li>
+      <li style="background:none;border:none;color:var(--text-muted);font-size:13px;justify-content:center">
+        Waiting for session...
+      </li>
     </ul>
   </div>
 </div>
@@ -53,10 +55,13 @@ function startCamera() {
     .then(d => {
       document.getElementById('video-feed').style.display = 'block';
       document.getElementById('cam-placeholder').style.display = 'none';
+      document.getElementById('cam-box').classList.add('active');
       document.getElementById('btn-start').style.display = 'none';
-      document.getElementById('btn-stop').style.display = 'inline-block';
-      document.getElementById('status-bar').textContent =
-        `Camera ON — ${d.enrolled} student(s) enrolled — blink detection active`;
+      document.getElementById('btn-stop').style.display = 'inline-flex';
+      const pill = document.getElementById('status-pill');
+      pill.classList.add('on');
+      document.getElementById('status-text').textContent =
+        `Camera ON — ${d.enrolled} enrolled — blink ${2}x to verify`;
       document.getElementById('live-list').innerHTML = '';
       markedIds.clear();
       polling = setInterval(pollStatus, 2000);
@@ -69,9 +74,11 @@ function stopCamera() {
     .then(d => {
       document.getElementById('video-feed').style.display = 'none';
       document.getElementById('cam-placeholder').style.display = 'block';
-      document.getElementById('btn-start').style.display = 'inline-block';
+      document.getElementById('cam-box').classList.remove('active');
+      document.getElementById('btn-start').style.display = 'inline-flex';
       document.getElementById('btn-stop').style.display = 'none';
-      document.getElementById('status-bar').textContent =
+      document.getElementById('status-pill').classList.remove('on');
+      document.getElementById('status-text').textContent =
         `Session ended — ${d.marked} student(s) marked present`;
       clearInterval(polling);
     });
@@ -82,21 +89,22 @@ function pollStatus() {
     .then(r => r.json())
     .then(records => {
       const list = document.getElementById('live-list');
-      let added = false;
       records.forEach(r => {
         if (!markedIds.has(r.student_id)) {
           markedIds.add(r.student_id);
+          const initials = r.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
           const li = document.createElement('li');
-          li.innerHTML = `<span class="dot"></span><span><strong>${r.name}</strong> — ${r.time}</span>`;
+          li.innerHTML = `
+            <div class="avatar">${initials}</div>
+            <div class="info">
+              <strong>${r.name}</strong>
+              <span>${r.student_id} &middot; ${r.time}</span>
+            </div>
+            <span class="badge badge-green" style="margin-left:auto">&#10003;</span>`;
           list.prepend(li);
-          added = true;
         }
       });
       document.getElementById('count-badge').textContent = markedIds.size;
-      if (added) {
-        document.getElementById('status-bar').textContent =
-          `Recognising faces — ${markedIds.size} marked present`;
-      }
     });
 }
 </script>

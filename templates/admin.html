@@ -1,10 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Students — FaceAttend{% endblock %}
 {% block content %}
-<div class="page-title">Manage Students</div>
-<div style="display:grid;grid-template-columns:1fr 1.8fr;gap:1.5rem">
+<div class="page-header">
+  <div>
+    <div class="page-title">Manage Students</div>
+    <div class="page-subtitle">{{ students|length }} student(s) enrolled</div>
+  </div>
+</div>
 
-  <div class="card">
+<div class="admin-grid">
+  <div class="card" style="margin-bottom:0">
     <div class="card-title">Add New Student</div>
     <div id="msg"></div>
     <div class="form-group">
@@ -16,36 +21,41 @@
       <input type="text" id="sid" placeholder="e.g. STU005">
     </div>
     <button class="btn btn-primary" onclick="addStudent()" style="width:100%">Add Student</button>
-    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #f0f0f0">
-      <p style="font-size:13px;color:#888;margin-bottom:.5rem">After adding, also add their photo to:</p>
-      <code style="font-size:12px;background:#f8f9fa;padding:4px 8px;border-radius:4px;display:block">
-        backend/known_faces/STUDENTID_Name.jpg
-      </code>
-      <p style="font-size:12px;color:#aaa;margin-top:.5rem">Then re-run recognition.py to enrol them.</p>
+    <div class="photo-hint" style="margin-top:1.2rem">
+      After adding, put their photo in:<br>
+      <code>backend/known_faces/STU005_Name.jpg</code><br>
+      Then re-run <code>python recognition.py</code>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">Enrolled Students ({{ students|length }})</div>
+  <div class="card" style="margin-bottom:0">
+    <div class="card-title">Enrolled Students</div>
     {% if students %}
+    <div class="table-wrap">
     <table>
-      <thead><tr><th>Name</th><th>Student ID</th><th>Enrolled</th><th>Action</th></tr></thead>
+      <thead><tr><th></th><th>Name</th><th>Student ID</th><th>Enrolled</th><th>Action</th></tr></thead>
       <tbody id="student-table">
         {% for s in students %}
         <tr id="row-{{ s.student_id }}">
-          <td>{{ s.name }}</td>
-          <td><span class="badge badge-blue">{{ s.student_id }}</span></td>
-          <td style="color:#888;font-size:13px">{{ s.enrolled_at[:10] }}</td>
           <td>
-            <button class="btn btn-danger" style="padding:5px 12px;font-size:12px"
+            <div class="student-avatar">
+              {{ s.name[:2].upper() }}
+            </div>
+          </td>
+          <td><strong>{{ s.name }}</strong></td>
+          <td><span class="badge badge-blue">{{ s.student_id }}</span></td>
+          <td style="color:var(--text-muted);font-size:13px">{{ s.enrolled_at[:10] }}</td>
+          <td>
+            <button class="btn btn-danger btn-sm"
               onclick="deleteStudent('{{ s.student_id }}','{{ s.name }}')">Remove</button>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <p style="color:#aaa;text-align:center;padding:2rem">No students enrolled yet.</p>
+    <div class="empty-state"><p>No students enrolled yet.<br>Add a student using the form.</p></div>
     {% endif %}
   </div>
 </div>
@@ -68,7 +78,7 @@ function addStudent() {
   .then(r => r.json())
   .then(d => {
     if (d.success) {
-      msg.innerHTML = `<div class="alert alert-success">${d.message}</div>`;
+      msg.innerHTML = `<div class="alert alert-success">&#10003; ${d.message}</div>`;
       document.getElementById('name').value = '';
       document.getElementById('sid').value  = '';
       setTimeout(() => location.reload(), 1200);
@@ -79,14 +89,10 @@ function addStudent() {
 }
 
 function deleteStudent(sid, name) {
-  if (!confirm(`Remove ${name} (${sid}) and all their attendance records?`)) return;
+  if (!confirm(`Remove ${name} (${sid}) and all their records?`)) return;
   fetch(`/api/students/delete/${sid}`, {method:'DELETE'})
     .then(r => r.json())
-    .then(d => {
-      if (d.success) {
-        document.getElementById(`row-${sid}`).remove();
-      }
-    });
+    .then(d => { if (d.success) document.getElementById(`row-${sid}`).remove(); });
 }
 </script>
 {% endblock %}

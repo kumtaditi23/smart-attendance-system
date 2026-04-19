@@ -1,55 +1,65 @@
 {% extends "base.html" %}
 {% block title %}Reports — FaceAttend{% endblock %}
 {% block content %}
-<div class="page-title">Attendance Reports</div>
-<div class="card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-  <label style="font-size:14px;font-weight:500">Select Date:</label>
-  <input type="date" id="date-picker" value="{{ selected_date }}"
-         style="width:auto;padding:8px 12px" onchange="filterDate()">
-  <a href="/api/export/csv?date={{ selected_date }}" class="btn btn-primary">
-    Export CSV
-  </a>
-  <span style="color:#888;font-size:13px;margin-left:auto">
-    {{ records|length }} record(s) found
-  </span>
+<div class="page-header">
+  <div>
+    <div class="page-title">Reports</div>
+    <div class="page-subtitle">View and export attendance records</div>
+  </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:1.5rem">
+<div class="filter-bar">
+  <label>Date</label>
+  <input type="date" id="date-picker" value="{{ selected_date }}"
+         style="width:auto" onchange="filterDate()">
+  <span class="badge badge-gray">{{ records|length }} record(s)</span>
+  <div class="export-btn">
+    <a href="/api/export/csv?date={{ selected_date }}" class="btn btn-success">
+      &#8681; Export CSV
+    </a>
+  </div>
+</div>
+
+<div class="reports-grid">
   <div class="card">
-    <div class="card-title">Attendance on {{ selected_date }}</div>
+    <div class="card-title">Attendance — {{ selected_date }}</div>
     {% if records %}
+    <div class="table-wrap">
     <table>
       <thead><tr><th>Name</th><th>Student ID</th><th>Time</th><th>Status</th></tr></thead>
       <tbody>
         {% for r in records %}
         <tr>
-          <td>{{ r.name }}</td>
-          <td>{{ r.student_id }}</td>
-          <td>{{ r.time }}</td>
-          <td><span class="badge badge-green">{{ r.status }}</span></td>
+          <td><strong>{{ r.name }}</strong></td>
+          <td><span class="badge badge-blue">{{ r.student_id }}</span></td>
+          <td style="color:var(--text-muted)">{{ r.time }}</td>
+          <td><span class="badge badge-green">&#10003; {{ r.status }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <p style="color:#aaa;text-align:center;padding:2rem">No records found for this date.</p>
+    <div class="empty-state"><p>No records found for this date.</p></div>
     {% endif %}
   </div>
 
   <div class="card">
     <div class="card-title">All-time Summary</div>
-    <canvas id="summary-chart"></canvas>
-    <table style="margin-top:1rem">
+    <canvas id="summary-chart" height="200"></canvas>
+    <div class="table-wrap" style="margin-top:1rem">
+    <table>
       <thead><tr><th>Name</th><th>Days Present</th></tr></thead>
       <tbody>
         {% for r in summary %}
         <tr>
-          <td>{{ r.name }}</td>
+          <td><strong>{{ r.name }}</strong></td>
           <td><span class="badge badge-blue">{{ r.days_present }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -57,29 +67,21 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 function filterDate() {
-  const d = document.getElementById('date-picker').value;
-  window.location.href = `/reports?date=${d}`;
+  window.location.href = `/reports?date=${document.getElementById('date-picker').value}`;
 }
-
-const names = [{% for r in summary %}"{{ r.name }}",{% endfor %}];
-const days  = [{% for r in summary %}{{ r.days_present }},{% endfor %}];
-const colors = ['#4ecca3','#3498db','#e74c3c','#f39c12','#9b59b6','#1abc9c'];
-
+const names  = [{% for r in summary %}"{{ r.name }}",{% endfor %}];
+const days   = [{% for r in summary %}{{ r.days_present }},{% endfor %}];
+const colors = ['#4ecca3','#63b3ed','#fc8181','#f6ad55','#b794f4','#68d391'];
 new Chart(document.getElementById('summary-chart'), {
   type: 'doughnut',
   data: {
     labels: names,
-    datasets:[{
-      data: days.map(d => d || 0.1),
-      backgroundColor: colors,
-      borderWidth: 2
-    }]
+    datasets:[{ data: days.map(d=>d||0.1), backgroundColor: colors, borderWidth:3 }]
   },
   options:{
     responsive:true,
-    plugins:{
-      legend:{position:'bottom',labels:{font:{size:12},padding:12}}
-    }
+    plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, padding:14 } } },
+    cutout:'65%'
   }
 });
 </script>
