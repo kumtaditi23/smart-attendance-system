@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Reports — FaceAttend{% endblock %}
+{% block content %}
+<div class="page-title">Attendance Reports</div>
+<div class="card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+  <label style="font-size:14px;font-weight:500">Select Date:</label>
+  <input type="date" id="date-picker" value="{{ selected_date }}"
+         style="width:auto;padding:8px 12px" onchange="filterDate()">
+  <a href="/api/export/csv?date={{ selected_date }}" class="btn btn-primary">
+    Export CSV
+  </a>
+  <span style="color:#888;font-size:13px;margin-left:auto">
+    {{ records|length }} record(s) found
+  </span>
+</div>
+
+<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:1.5rem">
+  <div class="card">
+    <div class="card-title">Attendance on {{ selected_date }}</div>
+    {% if records %}
+    <table>
+      <thead><tr><th>Name</th><th>Student ID</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td>{{ r.student_id }}</td>
+          <td>{{ r.time }}</td>
+          <td><span class="badge badge-green">{{ r.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#aaa;text-align:center;padding:2rem">No records found for this date.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-title">All-time Summary</div>
+    <canvas id="summary-chart"></canvas>
+    <table style="margin-top:1rem">
+      <thead><tr><th>Name</th><th>Days Present</th></tr></thead>
+      <tbody>
+        {% for r in summary %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td><span class="badge badge-blue">{{ r.days_present }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+function filterDate() {
+  const d = document.getElementById('date-picker').value;
+  window.location.href = `/reports?date=${d}`;
+}
+
+const names = [{% for r in summary %}"{{ r.name }}",{% endfor %}];
+const days  = [{% for r in summary %}{{ r.days_present }},{% endfor %}];
+const colors = ['#4ecca3','#3498db','#e74c3c','#f39c12','#9b59b6','#1abc9c'];
+
+new Chart(document.getElementById('summary-chart'), {
+  type: 'doughnut',
+  data: {
+    labels: names,
+    datasets:[{
+      data: days.map(d => d || 0.1),
+      backgroundColor: colors,
+      borderWidth: 2
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{
+      legend:{position:'bottom',labels:{font:{size:12},padding:12}}
+    }
+  }
+});
+</script>
+{% endblock %}

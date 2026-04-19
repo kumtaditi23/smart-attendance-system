@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — FaceAttend{% endblock %}
+{% block content %}
+<div class="page-title">Dashboard — {{ date }}</div>
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="num">{{ total_students }}</div>
+    <div class="label">Total Students</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#4ecca3">{{ total_present }}</div>
+    <div class="label">Present Today</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#e74c3c">{{ total_students - total_present }}</div>
+    <div class="label">Absent Today</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#f39c12">
+      {% if total_students > 0 %}{{ ((total_present / total_students) * 100)|int }}%{% else %}0%{% endif %}
+    </div>
+    <div class="label">Attendance Rate</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+  <div class="card">
+    <div class="card-title">Today's Attendance</div>
+    {% if today_records %}
+    <table>
+      <thead><tr><th>Name</th><th>ID</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for r in today_records %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td>{{ r.student_id }}</td>
+          <td>{{ r.time }}</td>
+          <td><span class="badge badge-green">{{ r.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#aaa;text-align:center;padding:2rem">No attendance marked yet today.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-title">Attendance Overview</div>
+    <canvas id="chart" height="220"></canvas>
+  </div>
+</div>
+
+<div style="text-align:center;margin-top:1rem">
+  <a href="/attendance" class="btn btn-primary" style="font-size:16px;padding:12px 32px">
+    Start Attendance Session
+  </a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const labels = [{% for r in summary %}"{{ r.name }}",{% endfor %}];
+const data   = [{% for r in summary %}{{ r.days_present }},{% endfor %}];
+new Chart(document.getElementById('chart'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets:[{
+      label:'Days Present',
+      data,
+      backgroundColor:'rgba(78,204,163,.7)',
+      borderColor:'#4ecca3',
+      borderWidth:1,
+      borderRadius:6
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{legend:{display:false}},
+    scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}
+  }
+});
+</script>
+{% endblock %}
