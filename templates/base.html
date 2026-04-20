@@ -15,10 +15,11 @@
     <span>Face</span>Attend
   </a>
   <ul>
-    <li><a href="/dashboard"   {% if request.path=='/dashboard'   %}class="active"{% endif %}>Dashboard</a></li>
-    <li><a href="/attendance"  {% if request.path=='/attendance'  %}class="active"{% endif %}>Attendance</a></li>
-    <li><a href="/admin"       {% if request.path=='/admin'       %}class="active"{% endif %}>Students</a></li>
-    <li><a href="/reports"     {% if request.path=='/reports'     %}class="active"{% endif %}>Reports</a></li>
+    <li><a href="/dashboard"  {% if request.path=='/dashboard'  %}class="active"{% endif %}>Dashboard</a></li>
+    <li><a href="/attendance" {% if request.path=='/attendance' %}class="active"{% endif %}>Attendance</a></li>
+    <li><a href="/subjects"   {% if request.path=='/subjects'   %}class="active"{% endif %}>Subjects</a></li>
+    <li><a href="/admin"      {% if request.path=='/admin'      %}class="active"{% endif %}>Students</a></li>
+    <li><a href="/reports"    {% if request.path=='/reports'    %}class="active"{% endif %}>Reports</a></li>
     <li><a href="/logout" class="logout">Logout</a></li>
   </ul>
 </nav>

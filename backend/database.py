@@ -6,21 +6,16 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "attendance.db")
 
 
 def get_connection():
-    """Return a connection to the SQLite database."""
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # lets you access columns by name
+    conn.row_factory = sqlite3.Row
     return conn
 
 
 def create_tables():
-    """
-    Create all tables if they don't already exist.
-    Call this once when the app starts.
-    """
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Table 1: students — stores enrolled people
+    # Students
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS students (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,16 +25,31 @@ def create_tables():
         )
     """)
 
-    # Table 2: attendance — one row per attendance event
+    # Subjects — with teacher name
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS subjects (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject_code  TEXT    UNIQUE NOT NULL,
+            subject_name  TEXT    NOT NULL,
+            teacher_name  TEXT    NOT NULL,
+            created_at    TEXT    NOT NULL
+        )
+    """)
+
+    # Attendance — now linked to a subject
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id  TEXT    NOT NULL,
-            name        TEXT    NOT NULL,
-            date        TEXT    NOT NULL,
-            time        TEXT    NOT NULL,
-            status      TEXT    NOT NULL DEFAULT 'Present',
-            FOREIGN KEY (student_id) REFERENCES students(student_id)
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id    TEXT    NOT NULL,
+            name          TEXT    NOT NULL,
+            subject_code  TEXT    NOT NULL,
+            subject_name  TEXT    NOT NULL,
+            teacher_name  TEXT    NOT NULL,
+            date          TEXT    NOT NULL,
+            time          TEXT    NOT NULL,
+            status        TEXT    NOT NULL DEFAULT 'Present',
+            FOREIGN KEY (student_id)   REFERENCES students(student_id),
+            FOREIGN KEY (subject_code) REFERENCES subjects(subject_code)
         )
     """)
 
@@ -48,13 +58,58 @@ def create_tables():
     print("[DB] Tables created (or already exist).")
 
 
+# ── Subject functions ──────────────────────────────────────────────────────────
+
+def add_subject(subject_code, subject_name, teacher_name):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO subjects (subject_code, subject_name, teacher_name, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (subject_code.upper(), subject_name, teacher_name,
+              datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+        print(f"[DB] Subject added: {subject_name} ({subject_code}) — {teacher_name}")
+        return True
+    except sqlite3.IntegrityError:
+        print(f"[DB] Subject code '{subject_code}' already exists.")
+        return False
+
+
+def get_all_subjects():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM subjects ORDER BY subject_name")
+    subjects = cursor.fetchall()
+    conn.close()
+    return subjects
+
+
+def get_subject_by_code(subject_code):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM subjects WHERE subject_code = ?",
+                   (subject_code.upper(),))
+    subject = cursor.fetchone()
+    conn.close()
+    return subject
+
+
+def delete_subject(subject_code):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM attendance WHERE subject_code = ?", (subject_code,))
+    cursor.execute("DELETE FROM subjects WHERE subject_code = ?", (subject_code,))
+    conn.commit()
+    conn.close()
+    print(f"[DB] Subject {subject_code} deleted.")
+
+
 # ── Student functions ──────────────────────────────────────────────────────────
 
 def add_student(name, student_id):
-    """
-    Add a new student to the database.
-    Returns True if added, False if student_id already exists.
-    """
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -72,7 +127,6 @@ def add_student(name, student_id):
 
 
 def get_all_students():
-    """Return a list of all enrolled students."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM students ORDER BY name")
@@ -82,7 +136,6 @@ def get_all_students():
 
 
 def get_student_by_id(student_id):
-    """Return a single student by their student_id, or None."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM students WHERE student_id = ?", (student_id,))
@@ -92,7 +145,6 @@ def get_student_by_id(student_id):
 
 
 def delete_student(student_id):
-    """Remove a student and all their attendance records."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM attendance WHERE student_id = ?", (student_id,))
@@ -104,137 +156,206 @@ def delete_student(student_id):
 
 # ── Attendance functions ───────────────────────────────────────────────────────
 
-def mark_attendance(student_id, name):
+def mark_attendance(student_id, name, subject_code):
     """
-    Mark a student as present for today.
-    Prevents duplicate entries — one mark per student per day.
-    Returns True if marked, False if already marked today.
+    Mark attendance for a student in a specific subject.
+    One mark per student per subject per day.
     """
-    today = datetime.now().strftime("%Y-%m-%d")
+    subject = get_subject_by_code(subject_code)
+    if not subject:
+        print(f"[DB] Subject '{subject_code}' not found.")
+        return False
+
+    today    = datetime.now().strftime("%Y-%m-%d")
     now_time = datetime.now().strftime("%H:%M:%S")
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Check if already marked today
+    # Check duplicate: same student + same subject + same day
     cursor.execute("""
         SELECT id FROM attendance
-        WHERE student_id = ? AND date = ?
-    """, (student_id, today))
+        WHERE student_id = ? AND subject_code = ? AND date = ?
+    """, (student_id, subject_code, today))
 
     if cursor.fetchone():
         conn.close()
-        print(f"[DB] {name} already marked present today.")
+        print(f"[DB] {name} already marked for {subject['subject_name']} today.")
         return False
 
-    # Insert new attendance record
     cursor.execute("""
-        INSERT INTO attendance (student_id, name, date, time, status)
-        VALUES (?, ?, ?, ?, 'Present')
-    """, (student_id, name, today, now_time))
+        INSERT INTO attendance
+        (student_id, name, subject_code, subject_name, teacher_name, date, time, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'Present')
+    """, (student_id, name, subject_code,
+          subject["subject_name"], subject["teacher_name"],
+          today, now_time))
 
     conn.commit()
     conn.close()
-    print(f"[DB] Attendance marked: {name} at {now_time}")
+    print(f"[DB] {name} marked for {subject['subject_name']} at {now_time}")
     return True
 
 
-def get_attendance_today():
-    """Return all attendance records for today."""
-    today = datetime.now().strftime("%Y-%m-%d")
+def get_attendance_today(subject_code=None):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT * FROM attendance
-        WHERE date = ?
-        ORDER BY time DESC
-    """, (today,))
+    today = datetime.now().strftime("%Y-%m-%d")
+    if subject_code:
+        cursor.execute("""
+            SELECT * FROM attendance
+            WHERE date = ? AND subject_code = ?
+            ORDER BY time DESC
+        """, (today, subject_code))
+    else:
+        cursor.execute("""
+            SELECT * FROM attendance WHERE date = ?
+            ORDER BY subject_name, time DESC
+        """, (today,))
     records = cursor.fetchall()
     conn.close()
     return records
 
 
-def get_attendance_by_date(date):
-    """Return attendance records for a specific date (format: YYYY-MM-DD)."""
+def get_attendance_by_date(date, subject_code=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    if subject_code:
+        cursor.execute("""
+            SELECT * FROM attendance
+            WHERE date = ? AND subject_code = ?
+            ORDER BY time DESC
+        """, (date, subject_code))
+    else:
+        cursor.execute("""
+            SELECT * FROM attendance WHERE date = ?
+            ORDER BY subject_name, time DESC
+        """, (date,))
+    records = cursor.fetchall()
+    conn.close()
+    return records
+
+
+def get_attendance_by_subject(subject_code):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT * FROM attendance
-        WHERE date = ?
-        ORDER BY time DESC
-    """, (date,))
+        WHERE subject_code = ?
+        ORDER BY date DESC, time DESC
+    """, (subject_code,))
     records = cursor.fetchall()
     conn.close()
     return records
 
 
 def get_attendance_by_student(student_id):
-    """Return all attendance records for a specific student."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT * FROM attendance
         WHERE student_id = ?
-        ORDER BY date DESC, time DESC
+        ORDER BY date DESC, subject_name
     """, (student_id,))
     records = cursor.fetchall()
     conn.close()
     return records
 
 
-def get_attendance_summary():
+def get_subject_summary(subject_code=None):
     """
-    Return a summary: each student with total days present.
-    Useful for the dashboard charts.
+    Returns per-student attendance count.
+    If subject_code given → for that subject only.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT s.name, s.student_id,
-               COUNT(a.id) AS days_present
-        FROM students s
-        LEFT JOIN attendance a ON s.student_id = a.student_id
-        GROUP BY s.student_id
-        ORDER BY s.name
-    """)
+    if subject_code:
+        cursor.execute("""
+            SELECT s.name, s.student_id,
+                   COUNT(a.id) AS classes_attended
+            FROM students s
+            LEFT JOIN attendance a
+              ON s.student_id = a.student_id
+             AND a.subject_code = ?
+            GROUP BY s.student_id
+            ORDER BY s.name
+        """, (subject_code,))
+    else:
+        cursor.execute("""
+            SELECT s.name, s.student_id,
+                   COUNT(a.id) AS classes_attended
+            FROM students s
+            LEFT JOIN attendance a ON s.student_id = a.student_id
+            GROUP BY s.student_id
+            ORDER BY s.name
+        """)
     summary = cursor.fetchall()
     conn.close()
     return summary
 
 
-# ── Quick test ─────────────────────────────────────────────────────────────────
+def get_student_subject_report(student_id):
+    """
+    Per-student breakdown: how many classes attended per subject.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            sub.subject_code,
+            sub.subject_name,
+            sub.teacher_name,
+            COUNT(a.id) AS classes_attended
+        FROM subjects sub
+        LEFT JOIN attendance a
+          ON sub.subject_code = a.subject_code
+         AND a.student_id = ?
+        GROUP BY sub.subject_code
+        ORDER BY sub.subject_name
+    """, (student_id,))
+    report = cursor.fetchall()
+    conn.close()
+    return report
+
+
+def get_total_classes_per_subject():
+    """Total number of unique class days held per subject."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT subject_code, subject_name, teacher_name,
+               COUNT(DISTINCT date) AS total_classes
+        FROM attendance
+        GROUP BY subject_code
+    """)
+    data = cursor.fetchall()
+    conn.close()
+    return data
+
 
 if __name__ == "__main__":
-    print("[TEST] Setting up database...")
+    print("[TEST] Setting up subject-wise database...")
     create_tables()
 
-    # Add test students
-    add_student("ADITI", "STU001")
-    add_student("ANJANA", "STU002")
-    add_student("ARCHISHA", "STU003")
-    add_student("DIVYA", "STU004")
-    add_student("DAKSH", "STU005")
+    add_subject("CS101", "Python Programming", "Dr. Sharma")
+    add_subject("CS102", "Java OOP",           "Prof. Mehta")
+    add_subject("CS103", "Data Structures",    "Dr. Patel")
 
-    # Mark some attendance
-    mark_attendance("STU001", "ADITI")
-    mark_attendance("STU002", "ANJANA")
-    mark_attendance("STU003", "ARCHISHA")
-    mark_attendance("STU004", "DIVYA")
-    mark_attendance("STU003", "DAKSH")
-    mark_attendance("STU003", "RAJVEER")  # duplicate — should be blocked
+    add_student("Aditi",   "STU001")
+    add_student("Anjana",  "STU002")
+    add_student("Rajveer", "STU023")
 
-    # Print today's attendance
-    print("\n[TEST] Today's attendance:")
-    for row in get_attendance_today():
-        print(f"  {row['name']} — {row['time']}")
+    mark_attendance("STU001", "Aditi",   "CS101")
+    mark_attendance("STU002", "Anjana",  "CS101")
+    mark_attendance("STU001", "Aditi",   "CS102")
+    mark_attendance("STU001", "Aditi",   "CS101")  # duplicate — blocked
 
-    # Print summary
-    print("\n[TEST] Summary:")
-    for row in get_attendance_summary():
-        print(f"  {row['name']} — {row['days_present']} day(s) present")
+    print("\n[TEST] Today CS101:")
+    for r in get_attendance_today("CS101"):
+        print(f"  {r['name']} — {r['subject_name']} — {r['teacher_name']} — {r['time']}")
 
-    print("\n[TEST] database.py working correctly!")
+    print("\n[TEST] Aditi subject report:")
+    for r in get_student_subject_report("STU001"):
+        print(f"  {r['subject_name']:20s} ({r['teacher_name']}) — {r['classes_attended']} class(es)")
 
-    if __name__ == "__main__":
-     print("[TEST] Setting up database...")
-    create_tables()
+    print("\n[TEST] database.py subject-wise working!")

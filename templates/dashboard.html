@@ -6,7 +6,7 @@
     <div class="page-title">Dashboard</div>
     <div class="page-subtitle">{{ date }}</div>
   </div>
-  <a href="/attendance" class="btn btn-primary btn-lg">Start Attendance</a>
+  <a href="/attendance" class="btn btn-primary btn-lg">Take Attendance</a>
 </div>
 
 <div class="stat-grid">
@@ -23,72 +23,54 @@
     <div class="label">Absent Today</div>
   </div>
   <div class="stat-card">
-    <div class="num" style="color:#f6ad55">
-      {% if total_students > 0 %}{{ ((total_present/total_students)*100)|int }}%{% else %}0%{% endif %}
-    </div>
-    <div class="label">Attendance Rate</div>
+    <div class="num" style="color:#63b3ed">{{ classes_today }}</div>
+    <div class="label">Classes Today</div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
-  <div class="card">
-    <div class="card-title">Today's Attendance</div>
+<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:1.5rem">
+  <div class="card" style="margin:0">
+    <div class="card-title">Today's Attendance by Subject</div>
     {% if today_records %}
     <div class="table-wrap">
     <table>
-      <thead><tr><th>Name</th><th>ID</th><th>Time</th><th>Status</th></tr></thead>
+      <thead><tr><th>Name</th><th>Subject</th><th>Teacher</th><th>Time</th></tr></thead>
       <tbody>
         {% for r in today_records %}
         <tr>
           <td><strong>{{ r.name }}</strong></td>
-          <td><span class="badge badge-blue">{{ r.student_id }}</span></td>
+          <td><span class="badge badge-purple">{{ r.subject_code }}</span> {{ r.subject_name }}</td>
+          <td style="color:var(--text-muted)">{{ r.teacher_name }}</td>
           <td style="color:var(--text-muted)">{{ r.time }}</td>
-          <td><span class="badge badge-green">&#10003; {{ r.status }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     </div>
     {% else %}
-    <div class="empty-state">
-      <p>No attendance marked yet today.<br>Go to Attendance to start a session.</p>
-    </div>
+    <div class="empty-state"><p>No attendance yet today.<br>Go to Attendance to start a session.</p></div>
     {% endif %}
   </div>
 
-  <div class="card">
-    <div class="card-title">Attendance Overview</div>
-    <canvas id="chart" height="240"></canvas>
+  <div class="card" style="margin:0">
+    <div class="card-title">Configured Subjects</div>
+    {% if subjects %}
+      {% for s in subjects %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border)">
+        <div>
+          <div style="font-size:14px;font-weight:500">{{ s.subject_name }}</div>
+          <div style="font-size:12px;color:var(--text-muted)">{{ s.teacher_name }}</div>
+        </div>
+        <span class="badge badge-purple">{{ s.subject_code }}</span>
+      </div>
+      {% endfor %}
+      <a href="/subjects" class="btn btn-secondary btn-sm" style="margin-top:1rem;width:100%;justify-content:center">Manage Subjects</a>
+    {% else %}
+      <div class="empty-state">
+        <p>No subjects yet.</p>
+        <a href="/subjects" class="btn btn-primary btn-sm" style="margin-top:.5rem">Add Subjects</a>
+      </div>
+    {% endif %}
   </div>
 </div>
-{% endblock %}
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
-const labels = [{% for r in summary %}"{{ r.name }}",{% endfor %}];
-const data   = [{% for r in summary %}{{ r.days_present }},{% endfor %}];
-new Chart(document.getElementById('chart'), {
-  type: 'bar',
-  data: {
-    labels,
-    datasets:[{
-      label:'Days Present',
-      data,
-      backgroundColor:'rgba(78,204,163,.75)',
-      borderColor:'#38b28e',
-      borderWidth:0,
-      borderRadius:8,
-      borderSkipped:false
-    }]
-  },
-  options:{
-    responsive:true,
-    plugins:{legend:{display:false}},
-    scales:{
-      y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#f0f0f0'}},
-      x:{grid:{display:false}}
-    }
-  }
-});
-</script>
 {% endblock %}

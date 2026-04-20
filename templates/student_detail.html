@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ student.name }} — FaceAttend{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:1rem">
+    <div class="student-avatar" style="width:52px;height:52px;font-size:18px">
+      {{ student.name[:2].upper() }}
+    </div>
+    <div>
+      <div class="page-title">{{ student.name }}</div>
+      <div class="page-subtitle">{{ student.student_id }} &middot; Enrolled {{ student.enrolled_at[:10] }}</div>
+    </div>
+  </div>
+  <a href="/reports" class="btn btn-secondary">Back to Reports</a>
+</div>
+
+<div class="stat-grid">
+  {% set total_attended = report|sum(attribute='classes_attended') %}
+  {% set total_classes  = totals.values()|sum %}
+  <div class="stat-card">
+    <div class="num">{{ report|length }}</div>
+    <div class="label">Subjects</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#4ecca3">{{ total_attended }}</div>
+    <div class="label">Total Classes Attended</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#f6ad55">
+      {% if total_classes > 0 %}{{ ((total_attended / total_classes) * 100)|int }}%{% else %}—{% endif %}
+    </div>
+    <div class="label">Overall Attendance</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Subject-wise Attendance</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Subject</th><th>Teacher</th><th>Classes Held</th><th>Attended</th><th>Percentage</th></tr>
+    </thead>
+    <tbody>
+      {% for r in report %}
+      {% set held = totals.get(r.subject_code, 0) %}
+      {% set pct  = ((r.classes_attended / held * 100)|int) if held > 0 else 0 %}
+      <tr>
+        <td>
+          <span class="badge badge-purple">{{ r.subject_code }}</span>
+          <strong style="margin-left:6px">{{ r.subject_name }}</strong>
+        </td>
+        <td style="color:var(--text-muted)">{{ r.teacher_name }}</td>
+        <td>{{ held }}</td>
+        <td><span class="badge badge-blue">{{ r.classes_attended }}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden">
+              <div style="width:{{ pct }}%;height:100%;background:{% if pct >= 75 %}#48bb78{% elif pct >= 50 %}#f6ad55{% else %}#fc8181{% endif %};border-radius:3px"></div>
+            </div>
+            <span class="badge {% if pct >= 75 %}badge-green{% elif pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}" style="min-width:44px;justify-content:center">
+              {{ pct }}%
+            </span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}
