@@ -141,6 +141,16 @@ def camera_thread():
     frame_count = 0
     last_results = []
 
+     # ── WARM UP FIX ── give camera 1 second to initialise
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # reduce buffer lag
+    cap.set(cv2.CAP_PROP_FPS, 30)        # request 30fps
+    
+    # Discard first 10 frames — camera needs to adjust exposure
+    for _ in range(10):
+        cap.read()
+
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
@@ -223,13 +233,20 @@ def camera_thread():
     camera_active = False
 
 def generate_frames():
+    import time
+    # Wait up to 3 seconds for first frame
+    waited = 0
+    while not latest_frame and waited < 3.0:
+        time.sleep(0.1)
+        waited += 0.1
+
     while camera_active:
         with camera_lock:
             frame = latest_frame
         if frame:
-            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
-        else:
-            import time; time.sleep(0.05)
+            yield (b"--frame\r\n"
+                   b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
+        import time; time.sleep(0.03)  # ~30fps cap
 
 @app.route("/video_feed")
 @login_required
