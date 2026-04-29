@@ -4,57 +4,70 @@
 <div class="page-header">
   <div>
     <div class="page-title">Reports</div>
-    <div class="page-subtitle">View and export attendance records</div>
+    <div class="page-subtitle">Filter by subject and date</div>
   </div>
 </div>
 
 <div class="filter-bar">
+  <label>Subject</label>
+  <select id="subj-filter" onchange="applyFilter()" style="width:auto">
+    <option value="">All Subjects</option>
+    {% for s in subjects %}
+    <option value="{{ s.subject_code }}"
+      {% if s.subject_code == selected_subject %}selected{% endif %}>
+      {{ s.subject_code }} — {{ s.subject_name }}
+    </option>
+    {% endfor %}
+  </select>
   <label>Date</label>
-  <input type="date" id="date-picker" value="{{ selected_date }}"
-         style="width:auto" onchange="filterDate()">
+  <input type="date" id="date-filter" value="{{ selected_date }}"
+         style="width:auto" onchange="applyFilter()">
   <span class="badge badge-gray">{{ records|length }} record(s)</span>
   <div class="export-btn">
-    <a href="/api/export/csv?date={{ selected_date }}" class="btn btn-success">
-      &#8681; Export CSV
-    </a>
+    <a href="/api/export/csv?date={{ selected_date }}&subject={{ selected_subject }}"
+       class="btn btn-success">&#8681; Export CSV</a>
   </div>
 </div>
 
 <div class="reports-grid">
   <div class="card">
-    <div class="card-title">Attendance — {{ selected_date }}</div>
+    <div class="card-title">Attendance Records</div>
     {% if records %}
     <div class="table-wrap">
     <table>
-      <thead><tr><th>Name</th><th>Student ID</th><th>Time</th><th>Status</th></tr></thead>
+      <thead><tr><th>Name</th><th>ID</th><th>Subject</th><th>Teacher</th><th>Time</th></tr></thead>
       <tbody>
         {% for r in records %}
         <tr>
           <td><strong>{{ r.name }}</strong></td>
           <td><span class="badge badge-blue">{{ r.student_id }}</span></td>
+          <td><span class="badge badge-purple">{{ r.subject_code }}</span> {{ r.subject_name }}</td>
+          <td style="color:var(--text-muted)">{{ r.teacher_name }}</td>
           <td style="color:var(--text-muted)">{{ r.time }}</td>
-          <td><span class="badge badge-green">&#10003; {{ r.status }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     </div>
     {% else %}
-    <div class="empty-state"><p>No records found for this date.</p></div>
+    <div class="empty-state"><p>No records for this filter.</p></div>
     {% endif %}
   </div>
 
   <div class="card">
-    <div class="card-title">All-time Summary</div>
-    <canvas id="summary-chart" height="200"></canvas>
-    <div class="table-wrap" style="margin-top:1rem">
+    <div class="card-title">Student Summary</div>
+    <div class="table-wrap">
     <table>
-      <thead><tr><th>Name</th><th>Days Present</th></tr></thead>
+      <thead><tr><th>Student</th><th>Classes Attended</th></tr></thead>
       <tbody>
         {% for r in summary %}
         <tr>
-          <td><strong>{{ r.name }}</strong></td>
-          <td><span class="badge badge-blue">{{ r.days_present }}</span></td>
+          <td>
+            <a href="/student/{{ r.student_id }}" style="color:var(--dark3);font-weight:500;text-decoration:none">
+              {{ r.name }}
+            </a>
+          </td>
+          <td><span class="badge badge-green">{{ r.classes_attended }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -64,25 +77,11 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-function filterDate() {
-  window.location.href = `/reports?date=${document.getElementById('date-picker').value}`;
+function applyFilter() {
+  const s = document.getElementById('subj-filter').value;
+  const d = document.getElementById('date-filter').value;
+  window.location.href = `/reports?date=${d}&subject=${s}`;
 }
-const names  = [{% for r in summary %}"{{ r.name }}",{% endfor %}];
-const days   = [{% for r in summary %}{{ r.days_present }},{% endfor %}];
-const colors = ['#4ecca3','#63b3ed','#fc8181','#f6ad55','#b794f4','#68d391'];
-new Chart(document.getElementById('summary-chart'), {
-  type: 'doughnut',
-  data: {
-    labels: names,
-    datasets:[{ data: days.map(d=>d||0.1), backgroundColor: colors, borderWidth:3 }]
-  },
-  options:{
-    responsive:true,
-    plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, padding:14 } } },
-    cutout:'65%'
-  }
-});
 </script>
 {% endblock %}

@@ -97,47 +97,79 @@ document.getElementById('subject-select')?.addEventListener('change', function()
 function startCamera() {
   const sel  = document.getElementById('subject-select');
   const code = sel?.value;
-  if (!code) {
-    alert('Please select a subject first!'); return;
-  }
+  if (!code) { alert('Please select a subject first!'); return; }
+
+  // Show loading state immediately
+  document.getElementById('cam-placeholder').innerHTML = `
+    <div style="color:#4ecca3;text-align:center">
+      <div style="font-size:40px;animation:spin 1s linear infinite">⟳</div>
+      <p style="margin-top:1rem;font-size:14px">Starting camera...</p>
+    </div>`;
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-start').textContent = 'Starting...';
+
   fetch('/api/camera/start', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({subject_code: code})
   })
   .then(r=>r.json()).then(d=>{
     if (!d.status) { alert(d.error); return; }
-    document.getElementById('video-feed').style.display  = 'block';
-    document.getElementById('cam-placeholder').style.display = 'none';
-    document.getElementById('cam-box').classList.add('active');
-    document.getElementById('btn-start').style.display = 'none';
-    document.getElementById('btn-stop').style.display  = 'inline-flex';
-    document.getElementById('subject-select').disabled  = true;
-    const pill = document.getElementById('status-pill');
-    pill.classList.add('on');
-    document.getElementById('status-text').textContent =
-      `${d.subject} — ${d.teacher} — blink ${2}x to verify`;
-    document.getElementById('subject-tag').style.display = 'block';
-    document.getElementById('active-subject-label').textContent = d.subject;
-    document.getElementById('live-list').innerHTML = '';
-    markedIds.clear();
-    polling = setInterval(()=>pollStatus(code), 2000);
+
+    // Small delay to let first frame render
+    setTimeout(() => {
+      document.getElementById('video-feed').style.display  = 'block';
+      document.getElementById('cam-placeholder').style.display = 'none';
+      document.getElementById('cam-box').classList.add('active');
+      document.getElementById('btn-start').style.display = 'none';
+      document.getElementById('btn-stop').style.display  = 'inline-flex';
+      document.getElementById('subject-select').disabled  = true;
+      const pill = document.getElementById('status-pill');
+      pill.classList.add('on');
+      document.getElementById('status-text').textContent =
+        `${d.subject} — ${d.teacher} — blink ${2}x to verify`;
+      document.getElementById('subject-tag').style.display = 'block';
+      document.getElementById('active-subject-label').textContent = d.subject;
+      document.getElementById('live-list').innerHTML = '';
+      markedIds.clear();
+      polling = setInterval(()=>pollStatus(code), 2000);
+    }, 1500); // wait 1.5 sec for camera to warm up
   });
 }
 
 function stopCamera() {
-  fetch('/api/camera/stop',{method:'POST'}).then(r=>r.json()).then(d=>{
-    document.getElementById('video-feed').style.display  = 'none';
-    document.getElementById('cam-placeholder').style.display = 'block';
-    document.getElementById('cam-box').classList.remove('active');
-    document.getElementById('btn-start').style.display = 'inline-flex';
-    document.getElementById('btn-stop').style.display  = 'none';
-    document.getElementById('subject-select').disabled  = false;
-    document.getElementById('status-pill').classList.remove('on');
-    document.getElementById('status-text').textContent =
-      `Session ended — ${d.marked} student(s) marked present`;
-    clearInterval(polling);
-  });
+    fetch('/api/camera/stop', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+        // 1. Reset the Placeholder to the Initial State (Camera Icon)
+        document.getElementById('cam-placeholder').innerHTML = `
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+            </svg>
+            <p>Select a subject above<br>then click <strong>Start Camera</strong></p>`;
+
+        // 2. Reset Button States
+        document.getElementById('btn-start').disabled = false;
+        document.getElementById('btn-start').textContent = 'Start Camera';
+        document.getElementById('btn-start').style.display = 'inline-flex';
+        
+        document.getElementById('btn-stop').style.display = 'none';
+        document.getElementById('btn-stop').disabled = false; // Reset for next use
+        document.getElementById('btn-stop').textContent = 'Stop';
+
+        // 3. UI Cleanup
+        document.getElementById('video-feed').style.display = 'none';
+        document.getElementById('cam-placeholder').style.display = 'block';
+        document.getElementById('cam-box').classList.remove('active');
+        document.getElementById('subject-select').disabled = false;
+        
+        // 4. Status Update
+        document.getElementById('status-pill').classList.remove('on');
+        document.getElementById('status-text').textContent = `Session ended — ${d.marked} student(s) marked present`;
+        
+        clearInterval(polling);
+    });
 }
+
 
 function pollStatus(code) {
   fetch(`/api/attendance/today?subject=${code}`)
