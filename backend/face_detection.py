@@ -2,6 +2,7 @@ import cv2
 import face_recognition
 import numpy as np
 from datetime import datetime
+from threading import Thread
 
 
 def start_camera(camera_index=0):
@@ -9,8 +10,8 @@ def start_camera(camera_index=0):
     cap = cv2.VideoCapture(camera_index)
     if not cap.isOpened():
         raise RuntimeError("Could not open webcam. Check if camera is connected.")
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
     return cap
 
 
@@ -19,22 +20,24 @@ def detect_faces_in_frame(frame):
     Detect face locations in a single frame.
     Returns list of (top, right, bottom, left) tuples.
     """
-    # Shrink frame to 1/4 size for faster detection
-    small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+    process_this_frame = True
 
-    # Convert BGR (OpenCV) to RGB (face_recognition)
-    rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+while True:
+    success, frame = cap.read()
+    if not success:
+        break
 
-    # Detect face locations
-    face_locations = face_recognition.face_locations(rgb_small_frame)
+    if process_this_frame:
+        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        rgb_small = small_frame[:, :, ::-1]
 
-    # Scale locations back up to original frame size
-    face_locations_full = [
-        (top * 4, right * 4, bottom * 4, left * 4)
-        for (top, right, bottom, left) in face_locations
-    ]
+        # 🔥 IMPORTANT: use HOG (fast)
+        face_locations = face_recognition.face_locations(rgb_small, model="hog")
+        face_encodings = face_recognition.face_encodings(rgb_small, face_locations)
 
-    return face_locations_full
+        # 👇 yaha tumhara existing matching code rahega
+
+    process_this_frame = not process_this_frame
 
 
 def get_face_encodings(frame, face_locations):
@@ -134,7 +137,7 @@ def run_detection_loop():
             frame_count += 1
 
             # Only detect on even frames (skip every other frame)
-            if frame_count % 2 == 0:
+            if frame_count % 3 != 0:
                 face_locations = detect_faces_in_frame(frame)
                 encodings = get_face_encodings(frame, face_locations)
 
@@ -161,6 +164,28 @@ def run_detection_loop():
         cv2.destroyAllWindows()
         print("[INFO] Camera released. Detection stopped.")
 
+class VideoCamera:
+    def __init__(self):
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(3, 640)
+        self.cap.set(4, 480)
+        self.frame = None
+        self.running = True
+
+        Thread(target=self.update, daemon=True).start()
+
+    def update(self):
+        while self.running:
+            success, frame = self.cap.read()
+            if success:
+                self.frame = frame
+
+    def get_frame(self):
+        return self.frame
+
+    def stop(self):
+        self.running = False
+        self.cap.release()
 
 # Run directly to test this module standalone
 if __name__ == "__main__":
