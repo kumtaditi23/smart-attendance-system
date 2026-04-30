@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — FaceAttend{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Dashboard</div>
+    <div class="page-subtitle">{{ date }}</div>
+  </div>
+  <a href="/attendance" class="btn btn-primary btn-lg">Take Attendance</a>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="num">{{ total_students }}</div>
+    <div class="label">Total Students</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#4ecca3">{{ total_present }}</div>
+    <div class="label">Present Today</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#fc8181">{{ total_students - total_present }}</div>
+    <div class="label">Absent Today</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:#63b3ed">{{ classes_today }}</div>
+    <div class="label">Classes Today</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:1.5rem">
+  <div class="card" style="margin:0">
+    <div class="card-title">Today's Attendance by Subject</div>
+    {% if today_records %}
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Subject</th><th>Teacher</th><th>Time</th></tr></thead>
+      <tbody>
+        {% for r in today_records %}
+        <tr>
+          <td><strong>{{ r.name }}</strong></td>
+          <td><span class="badge badge-purple">{{ r.subject_code }}</span> {{ r.subject_name }}</td>
+          <td style="color:var(--text-muted)">{{ r.teacher_name }}</td>
+          <td style="color:var(--text-muted)">{{ r.time }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><p>No attendance yet today.<br>Go to Attendance to start a session.</p></div>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin:0">
+    <div class="card-title">Configured Subjects</div>
+    {% if subjects %}
+      {% for s in subjects %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border)">
+        <div>
+          <div style="font-size:14px;font-weight:500">{{ s.subject_name }}</div>
+          <div style="font-size:12px;color:var(--text-muted)">{{ s.teacher_name }}</div>
+        </div>
+        <span class="badge badge-purple">{{ s.subject_code }}</span>
+      </div>
+      {% endfor %}
+      <a href="/subjects" class="btn btn-secondary btn-sm" style="margin-top:1rem;width:100%;justify-content:center">Manage Subjects</a>
+    {% else %}
+      <div class="empty-state">
+        <p>No subjects yet.</p>
+        <a href="/subjects" class="btn btn-primary btn-sm" style="margin-top:.5rem">Add Subjects</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

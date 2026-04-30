@@ -31,7 +31,7 @@
 
 <div class="reports-grid">
   <div class="card">
-    <div class="card-title">Attendance Records</div>
+    <div class="card-title">Attendance Records — {{ selected_date }}</div>
     {% if records %}
     <div class="table-wrap">
     <table>
@@ -50,12 +50,19 @@
     </table>
     </div>
     {% else %}
-    <div class="empty-state"><p>No records for this filter.</p></div>
+    <div class="empty-state"><p>No records found for this filter.</p></div>
     {% endif %}
   </div>
 
   <div class="card">
     <div class="card-title">Student Summary</div>
+
+    {% if summary %}
+      <canvas id="summaryChart" style="width:100%;max-height:220px;margin-bottom:1rem"></canvas>
+    {% else %}
+      <div class="empty-state" style="padding:1rem 0"><p>No summary data yet.</p></div>
+    {% endif %}
+
     <div class="table-wrap">
     <table>
       <thead><tr><th>Student</th><th>Classes Attended</th></tr></thead>
@@ -63,7 +70,8 @@
         {% for r in summary %}
         <tr>
           <td>
-            <a href="/student/{{ r.student_id }}" style="color:var(--dark3);font-weight:500;text-decoration:none">
+            <a href="/student/{{ r.student_id }}"
+               style="color:var(--dark3);font-weight:500;text-decoration:none">
               {{ r.name }}
             </a>
           </td>
@@ -76,12 +84,88 @@
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
+{% if summary %}
+<script>
+function loadChartJS(callback) {
+  var script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  script.onload = callback;
+  script.onerror = function() {
+    var s2 = document.createElement('script');
+    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
+    s2.onload = callback;
+    s2.onerror = function() {
+      var c = document.getElementById('summaryChart');
+      if (c) c.remove();
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(script);
+}
+
+var summaryLabels = {{ summary | map(attribute='name') | list | tojson }};
+var summaryData   = {{ summary | map(attribute='classes_attended') | list | tojson }};
+var colors = ['#4ecca3','#63b3ed','#fc8181','#f6ad55','#b794f4','#68d391','#f687b3'];
+
+loadChartJS(function() {
+  var ctx = document.getElementById('summaryChart');
+  if (!ctx) return;
+
+  // Filter out students with 0 attendance for cleaner chart
+  var filtered = summaryLabels.map(function(l, i) {
+    return { label: l, value: summaryData[i] };
+  }).filter(function(d) { return d.value > 0; });
+
+  if (filtered.length === 0) {
+    ctx.remove();
+    return;
+  }
+
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: filtered.map(function(d) { return d.label; }),
+      datasets: [{
+        data: filtered.map(function(d) { return d.value; }),
+        backgroundColor: colors.slice(0, filtered.length),
+        borderWidth: 3,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '60%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            font: { size: 12 },
+            padding: 12,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ' ' + context.label + ': ' + context.parsed + ' class(es)';
+            }
+          }
+        }
+      }
+    }
+  });
+});
+</script>
+{% endif %}
+
 <script>
 function applyFilter() {
-  const s = document.getElementById('subj-filter').value;
-  const d = document.getElementById('date-filter').value;
-  window.location.href = `/reports?date=${d}&subject=${s}`;
+  var s = document.getElementById('subj-filter').value;
+  var d = document.getElementById('date-filter').value;
+  window.location.href = '/reports?date=' + d + '&subject=' + s;
 }
 </script>
 {% endblock %}

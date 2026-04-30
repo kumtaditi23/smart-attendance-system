@@ -97,7 +97,17 @@ document.getElementById('subject-select')?.addEventListener('change', function()
 function startCamera() {
   const sel  = document.getElementById('subject-select');
   const code = sel?.value;
+  if (polling) clearInterval(polling);
+  if (polling) {
+  clearInterval(polling);
+  polling = null;
+}
   if (!code) { alert('Please select a subject first!'); return; }
+
+  const video = document.getElementById('video-feed');
+
+// 🔥 force new stream every time
+video.src = `/video_feed?ts=${Date.now()}`;
 
   // Show loading state immediately
   document.getElementById('cam-placeholder').innerHTML = `
@@ -117,7 +127,9 @@ function startCamera() {
 
     // Small delay to let first frame render
     setTimeout(() => {
-      document.getElementById('video-feed').style.display  = 'block';
+      const video = document.getElementById('video-feed');
+      video.src = `/video_feed?ts=${Date.now()}`; // 💥 FIX
+      video.style.display = 'block';
       document.getElementById('cam-placeholder').style.display = 'none';
       document.getElementById('cam-box').classList.add('active');
       document.getElementById('btn-start').style.display = 'none';
@@ -140,32 +152,48 @@ function stopCamera() {
     fetch('/api/camera/stop', { method: 'POST' })
     .then(r => r.json())
     .then(d => {
-        // 1. Reset the Placeholder to the Initial State (Camera Icon)
+         const video = document.getElementById('video-feed');
+         video.src = "";   // 🔥 important
+        // Reset Placeholder
         document.getElementById('cam-placeholder').innerHTML = `
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-                <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+                <path d="M23 7l-7 5 7 5V7z"/>
+                <rect x="1" y="5" width="15" height="14" rx="2"/>
             </svg>
             <p>Select a subject above<br>then click <strong>Start Camera</strong></p>`;
 
-        // 2. Reset Button States
-        document.getElementById('btn-start').disabled = false;
-        document.getElementById('btn-start').textContent = 'Start Camera';
-        document.getElementById('btn-start').style.display = 'inline-flex';
-        
-        document.getElementById('btn-stop').style.display = 'none';
-        document.getElementById('btn-stop').disabled = false; // Reset for next use
-        document.getElementById('btn-stop').textContent = 'Stop';
+        // Buttons reset
+        const startBtn = document.getElementById('btn-start');
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start Camera';
+        startBtn.style.display = 'inline-flex';
 
-        // 3. UI Cleanup
+        const stopBtn = document.getElementById('btn-stop');
+        stopBtn.style.display = 'none';
+
+        // Camera UI reset
         document.getElementById('video-feed').style.display = 'none';
         document.getElementById('cam-placeholder').style.display = 'block';
         document.getElementById('cam-box').classList.remove('active');
+
+        // ✅ FIX: Reset subject UI
         document.getElementById('subject-select').disabled = false;
-        
-        // 4. Status Update
+        document.getElementById('subject-tag').style.display = 'none';
+        document.getElementById('active-subject-label').textContent = '';
+
+        // Status
         document.getElementById('status-pill').classList.remove('on');
-        document.getElementById('status-text').textContent = `Session ended — ${d.marked} student(s) marked present`;
-        
+        document.getElementById('status-text').textContent =
+            `Session ended — ${d.marked} student(s) marked present`;
+
+        // Reset list + count (optional but recommended)
+        document.getElementById('live-list').innerHTML = `
+          <li style="background:none;border:none;color:var(--text-muted);font-size:13px;justify-content:center">
+            Waiting for session...
+          </li>`;
+        document.getElementById('count-badge').textContent = '0';
+
+        markedIds.clear();
         clearInterval(polling);
     });
 }

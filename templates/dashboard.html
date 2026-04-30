@@ -53,24 +53,108 @@
   </div>
 
   <div class="card" style="margin:0">
-    <div class="card-title">Configured Subjects</div>
-    {% if subjects %}
+    <div class="card-title">Attendance Overview</div>
+    {% if summary %}
+      <canvas id="attendanceChart" style="width:100%;max-height:260px"></canvas>
+    {% else %}
+      <div class="empty-state"><p>No data yet.<br>Mark attendance to see chart.</p></div>
+    {% endif %}
+
+    <div style="margin-top:1.2rem">
+      <div class="card-title">Subjects</div>
       {% for s in subjects %}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div>
-          <div style="font-size:14px;font-weight:500">{{ s.subject_name }}</div>
+          <div style="font-size:13px;font-weight:500">{{ s.subject_name }}</div>
           <div style="font-size:12px;color:var(--text-muted)">{{ s.teacher_name }}</div>
         </div>
         <span class="badge badge-purple">{{ s.subject_code }}</span>
       </div>
+      {% else %}
+      <p style="font-size:13px;color:var(--text-muted);padding:.5rem 0">No subjects yet. <a href="/subjects">Add subjects →</a></p>
       {% endfor %}
-      <a href="/subjects" class="btn btn-secondary btn-sm" style="margin-top:1rem;width:100%;justify-content:center">Manage Subjects</a>
-    {% else %}
-      <div class="empty-state">
-        <p>No subjects yet.</p>
-        <a href="/subjects" class="btn btn-primary btn-sm" style="margin-top:.5rem">Add Subjects</a>
-      </div>
-    {% endif %}
+    </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if summary %}
+<!-- Load Chart.js — try CDN first, fallback to local -->
+<script>
+function loadChartJS(callback) {
+  var script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  script.onload = callback;
+  script.onerror = function() {
+    // CDN failed — try alternate CDN
+    var s2 = document.createElement('script');
+    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
+    s2.onload = callback;
+    s2.onerror = function() {
+      document.getElementById('attendanceChart').insertAdjacentHTML(
+        'afterend',
+        '<p style="color:var(--text-muted);font-size:13px;text-align:center">Chart requires internet connection.</p>'
+      );
+      document.getElementById('attendanceChart').remove();
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(script);
+}
+
+// Pass Jinja2 data safely into JS
+
+var chartLabels = {{ summary | map(attribute='name') | list | tojson }};
+var chartData   = {{ summary | map(attribute='classes_attended') | list | tojson }};
+
+loadChartJS(function() {
+  var ctx = document.getElementById('attendanceChart');
+  if (!ctx) return;
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: 'Classes Attended',
+        data: chartData,
+        backgroundColor: [
+          'rgba(78,204,163,0.8)',
+          'rgba(99,179,237,0.8)',
+          'rgba(246,173,85,0.8)',
+          'rgba(252,129,129,0.8)',
+          'rgba(183,148,244,0.8)',
+          'rgba(104,211,145,0.8)'
+        ],
+        borderColor: [
+          '#4ecca3','#63b3ed','#f6ad55','#fc8181','#b794f4','#68d391'
+        ],
+        borderWidth: 1,
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1, font: { size: 11 } },
+          grid: { color: '#f0f0f0' }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 11 } }
+        }
+      }
+    }
+  });
+});
+</script>
+{% endif %}
 {% endblock %}
