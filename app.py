@@ -232,7 +232,7 @@ def camera_thread():
 
 def generate_frames():
     import time
-    # Wait up to 3 seconds for first frame
+    # Wait up to 3 seconds for first framegit 
     waited = 0
     while not latest_frame and waited < 3.0:
         time.sleep(0.1)
