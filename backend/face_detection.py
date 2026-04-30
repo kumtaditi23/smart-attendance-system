@@ -3,6 +3,7 @@ import face_recognition
 import numpy as np
 from datetime import datetime
 from threading import Thread
+cap = cv2.VideoCapture(0)
 
 
 def start_camera(camera_index=0):
