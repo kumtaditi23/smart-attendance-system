@@ -8,14 +8,14 @@ BASE_DIR    = os.path.dirname(__file__)
 BACKEND_DIR = os.path.join(BASE_DIR, "backend")
 sys.path.insert(0, BACKEND_DIR)
 
-from database    import (create_tables,
+from backend.database    import (create_tables,
                           add_subject, get_all_subjects, get_subject_by_code, delete_subject,
                           add_student, get_all_students, delete_student,
                           mark_attendance, get_attendance_today, get_attendance_by_date,
                           get_subject_summary, get_student_subject_report,
                           get_total_classes_per_subject)
-from recognition import load_encodings, identify_faces
-from liveness    import LivenessChecker, draw_liveness_overlay, REQUIRED_BLINKS
+from backend.recognition import load_encodings, identify_faces
+from backend.liveness    import LivenessChecker, draw_liveness_overlay, REQUIRED_BLINKS
 
 app = Flask(__name__)
 app.secret_key = "attendance_secret_2024"
@@ -122,7 +122,7 @@ def reports():
 @app.route("/student/<student_id>")
 @login_required
 def student_detail(student_id):
-    from database import get_student_by_id
+    from backend.database import get_student_by_id
     student = get_student_by_id(student_id)
     report  = get_student_subject_report(student_id)
     totals  = {r["subject_code"]: r["total_classes"]
@@ -142,17 +142,15 @@ def camera_thread():
     last_results = []
 
      # ── WARM UP FIX ── give camera 1 second to initialise
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # reduce buffer lag
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # reduce buffer lag
     cap.set(cv2.CAP_PROP_FPS, 30)        # request 30fps
     
-    # Discard first 10 frames — camera needs to adjust exposure
-    for _ in range(10):
+    # Discard first 8 frames — camera needs to adjust exposure
+    for _ in range(8):
         cap.read()
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
     subject = get_subject_by_code(active_subject) if active_subject else None
     subj_label = f"{subject['subject_name']} — {subject['teacher_name']}" if subject else "No subject"
@@ -225,7 +223,7 @@ def camera_thread():
         cv2.putText(display, f"Present: {len(session_marked)}",
                     (w-120,24),cv2.FONT_HERSHEY_SIMPLEX,.48,(100,220,100),1)
 
-        _, buffer = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY,80])
+        _, buffer = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY,60])
         with camera_lock:
             latest_frame = buffer.tobytes()
 
