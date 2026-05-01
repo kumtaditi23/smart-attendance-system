@@ -73,9 +73,11 @@ def dashboard():
     total_students = len(get_all_students())
     total_present  = len(set(r["student_id"] for r in today_records))
     classes_today  = len(set(r["subject_code"] for r in today_records))
+    summary        = get_subject_summary()
     return render_template("dashboard.html",
                            subjects=subjects,
                            today_records=today_records,
+                           summary=summary, 
                            total_students=total_students,
                            total_present=total_present,
                            classes_today=classes_today,

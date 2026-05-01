@@ -18,8 +18,8 @@
 
 <div class="card">
   <div class="card-title">Select Subject</div>
-  <div class="form-row" style="align-items:flex-end">
-    <div class="form-group" style="margin:0">
+  <div style="display:flex;align-items:flex-end;gap:1rem;flex-wrap:wrap">
+    <div class="form-group" style="margin:0;min-width:280px">
       <label>Subject</label>
       <select id="subject-select">
         <option value="">— Choose a subject —</option>
@@ -45,16 +45,33 @@
 <div class="cam-wrap">
   <div>
     <div class="cam-controls">
-      <button class="btn btn-primary btn-lg" id="btn-start" onclick="startCamera()">Start Camera</button>
-      <button class="btn btn-danger btn-lg"  id="btn-stop"  onclick="stopCamera()" style="display:none">Stop</button>
+      <button class="btn btn-primary btn-lg" id="btn-start" onclick="startCamera()">
+        &#9654; Start Camera
+      </button>
+      <button class="btn btn-danger btn-lg" id="btn-stop" onclick="stopCamera()" style="display:none">
+        &#9632; Stop
+      </button>
     </div>
+
     <div class="cam-feed-box" id="cam-box">
-      <img id="video-feed" src="/video_feed" alt="Live feed">
+      <!-- Video feed — hidden until camera starts -->
+      <img id="video-feed" src="" alt="Live feed"
+           style="display:none;width:100%;border-radius:var(--radius-lg)">
+
+      <!-- Placeholder shown before camera starts -->
       <div class="cam-placeholder" id="cam-placeholder">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-          <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.2">
+          <path d="M23 7l-7 5 7 5V7z"/>
+          <rect x="1" y="5" width="15" height="14" rx="2"/>
         </svg>
         <p>Select a subject above<br>then click <strong>Start Camera</strong></p>
+      </div>
+
+      <!-- Loading spinner shown while camera warms up -->
+      <div id="cam-loading" style="display:none;text-align:center;padding:3rem;color:#4ecca3">
+        <div style="font-size:48px;animation:spin 1s linear infinite;display:inline-block">&#9696;</div>
+        <p style="margin-top:1rem;font-size:14px;color:#718096">Starting camera, please wait...</p>
       </div>
     </div>
   </div>
@@ -68,158 +85,162 @@
       Subject: <strong id="active-subject-label"></strong>
     </div>
     <ul id="live-list">
-      <li style="background:none;border:none;color:var(--text-muted);font-size:13px;justify-content:center">
-        Waiting for session...
+      <li style="background:none;border:none;color:var(--text-muted);font-size:13px;
+                 list-style:none;text-align:center;padding:1rem 0">
+        Waiting for session to start...
       </li>
     </ul>
   </div>
 </div>
 {% endif %}
 {% endblock %}
-{% block scripts %}
-<script>
-let polling   = null;
-let markedIds = new Set();
 
-document.getElementById('subject-select')?.addEventListener('change', function() {
-  const opt  = this.options[this.selectedIndex];
-  const info = document.getElementById('subject-info');
-  if (this.value) {
-    const parts = opt.text.split(' — ');
-    document.getElementById('info-subject').textContent = parts[1]?.split(' (')[0] || '';
-    document.getElementById('info-teacher').textContent = opt.text.match(/\(([^)]+)\)/)?.[1] || '';
-    info.style.display = 'block';
-  } else {
-    info.style.display = 'none';
-  }
-});
+{% block scripts %}
+<style>
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+</style>
+<script>
+var polling   = null;
+var markedIds = new Set();
+
+// Show subject info when dropdown changes
+var sel = document.getElementById('subject-select');
+if (sel) {
+  sel.addEventListener('change', function() {
+    var opt  = this.options[this.selectedIndex];
+    var info = document.getElementById('subject-info');
+    if (this.value) {
+      var text  = opt.text;                          // "CS101 — Python (Dr. X)"
+      var parts = text.split(' — ');
+      var name  = parts[1] ? parts[1].split(' (')[0] : '';
+      var teacher = text.match(/\(([^)]+)\)/);
+      document.getElementById('info-subject').textContent = name;
+      document.getElementById('info-teacher').textContent = teacher ? teacher[1] : '';
+      info.style.display = 'block';
+    } else {
+      info.style.display = 'none';
+    }
+  });
+}
 
 function startCamera() {
-  const sel  = document.getElementById('subject-select');
-  const code = sel?.value;
-  if (polling) clearInterval(polling);
-  if (polling) {
-  clearInterval(polling);
-  polling = null;
-}
+  var sel  = document.getElementById('subject-select');
+  var code = sel ? sel.value : '';
   if (!code) { alert('Please select a subject first!'); return; }
 
-  const video = document.getElementById('video-feed');
-
-// 🔥 force new stream every time
-video.src = `/video_feed?ts=${Date.now()}`;
-
-  // Show loading state immediately
-  document.getElementById('cam-placeholder').innerHTML = `
-    <div style="color:#4ecca3;text-align:center">
-      <div style="font-size:40px;animation:spin 1s linear infinite">⟳</div>
-      <p style="margin-top:1rem;font-size:14px">Starting camera...</p>
-    </div>`;
-  document.getElementById('btn-start').disabled = true;
-  document.getElementById('btn-start').textContent = 'Starting...';
+  // Immediately show loading spinner
+  document.getElementById('cam-placeholder').style.display = 'none';
+  document.getElementById('cam-loading').style.display     = 'block';
+  document.getElementById('btn-start').disabled            = true;
+  document.getElementById('btn-start').textContent         = 'Starting...';
 
   fetch('/api/camera/start', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({subject_code: code})
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject_code: code })
   })
-  .then(r=>r.json()).then(d=>{
-    if (!d.status) { alert(d.error); return; }
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (!d.status) {
+      // Error — reset UI
+      document.getElementById('cam-loading').style.display     = 'none';
+      document.getElementById('cam-placeholder').style.display = 'block';
+      document.getElementById('btn-start').disabled            = false;
+      document.getElementById('btn-start').textContent         = 'Start Camera';
+      alert(d.error || 'Failed to start camera');
+      return;
+    }
 
-    // Small delay to let first frame render
-    setTimeout(() => {
-      const video = document.getElementById('video-feed');
-      video.src = `/video_feed?ts=${Date.now()}`; // 💥 FIX
-      video.style.display = 'block';
-      document.getElementById('cam-placeholder').style.display = 'none';
+    // Set the video feed src NOW (starts loading stream)
+    document.getElementById('video-feed').src = '/video_feed';
+
+    // Wait 2 seconds for camera to warm up, then show feed
+    setTimeout(function() {
+      document.getElementById('cam-loading').style.display  = 'none';
+      document.getElementById('video-feed').style.display   = 'block';
       document.getElementById('cam-box').classList.add('active');
-      document.getElementById('btn-start').style.display = 'none';
-      document.getElementById('btn-stop').style.display  = 'inline-flex';
-      document.getElementById('subject-select').disabled  = true;
-      const pill = document.getElementById('status-pill');
-      pill.classList.add('on');
+      document.getElementById('btn-start').style.display    = 'none';
+      document.getElementById('btn-stop').style.display     = 'inline-flex';
+      if (sel) sel.disabled = true;
+
+      // Status pill
+      var pill = document.getElementById('status-pill');
+      if (pill) pill.classList.add('on');
       document.getElementById('status-text').textContent =
-        `${d.subject} — ${d.teacher} — blink ${2}x to verify`;
-      document.getElementById('subject-tag').style.display = 'block';
+        d.subject + ' — ' + d.teacher + ' — blink 2x to verify';
+
+      document.getElementById('subject-tag').style.display        = 'block';
       document.getElementById('active-subject-label').textContent = d.subject;
-      document.getElementById('live-list').innerHTML = '';
+      document.getElementById('live-list').innerHTML               = '';
       markedIds.clear();
-      polling = setInterval(()=>pollStatus(code), 2000);
-    }, 1500); // wait 1.5 sec for camera to warm up
+
+      // Poll for marked students every 2 seconds
+      polling = setInterval(function() { pollStatus(code); }, 2000);
+    }, 2000);
+  })
+  .catch(function(err) {
+    document.getElementById('cam-loading').style.display     = 'none';
+    document.getElementById('cam-placeholder').style.display = 'block';
+    document.getElementById('btn-start').disabled            = false;
+    document.getElementById('btn-start').textContent         = '&#9654; Start Camera';
+    alert('Error starting camera: ' + err);
   });
 }
 
 function stopCamera() {
-    fetch('/api/camera/stop', { method: 'POST' })
-    .then(r => r.json())
-    .then(d => {
-         const video = document.getElementById('video-feed');
-         video.src = "";   // 🔥 important
-        // Reset Placeholder
-        document.getElementById('cam-placeholder').innerHTML = `
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-                <path d="M23 7l-7 5 7 5V7z"/>
-                <rect x="1" y="5" width="15" height="14" rx="2"/>
-            </svg>
-            <p>Select a subject above<br>then click <strong>Start Camera</strong></p>`;
-
-        // Buttons reset
-        const startBtn = document.getElementById('btn-start');
-        startBtn.disabled = false;
-        startBtn.textContent = 'Start Camera';
-        startBtn.style.display = 'inline-flex';
-
-        const stopBtn = document.getElementById('btn-stop');
-        stopBtn.style.display = 'none';
-
-        // Camera UI reset
-        document.getElementById('video-feed').style.display = 'none';
-        document.getElementById('cam-placeholder').style.display = 'block';
-        document.getElementById('cam-box').classList.remove('active');
-
-        // ✅ FIX: Reset subject UI
-        document.getElementById('subject-select').disabled = false;
-        document.getElementById('subject-tag').style.display = 'none';
-        document.getElementById('active-subject-label').textContent = '';
-
-        // Status
-        document.getElementById('status-pill').classList.remove('on');
-        document.getElementById('status-text').textContent =
-            `Session ended — ${d.marked} student(s) marked present`;
-
-        // Reset list + count (optional but recommended)
-        document.getElementById('live-list').innerHTML = `
-          <li style="background:none;border:none;color:var(--text-muted);font-size:13px;justify-content:center">
-            Waiting for session...
-          </li>`;
-        document.getElementById('count-badge').textContent = '0';
-
-        markedIds.clear();
-        clearInterval(polling);
-    });
+  clearInterval(polling);
+  fetch('/api/camera/stop', { method: 'POST' })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    document.getElementById('video-feed').style.display      = 'none';
+    document.getElementById('video-feed').src                = '';
+    document.getElementById('cam-placeholder').style.display = 'block';
+    document.getElementById('cam-box').classList.remove('active');
+    document.getElementById('btn-start').style.display       = 'inline-flex';
+    document.getElementById('btn-start').disabled            = false;
+    document.getElementById('btn-start').innerHTML           = '&#9654; Start Camera';
+    document.getElementById('btn-stop').style.display        = 'none';
+    var sel = document.getElementById('subject-select');
+    if (sel) sel.disabled = false;
+    var pill = document.getElementById('status-pill');
+    if (pill) pill.classList.remove('on');
+    document.getElementById('status-text').textContent =
+      'Session ended — ' + d.marked + ' student(s) marked present';
+  });
 }
 
-
 function pollStatus(code) {
-  fetch(`/api/attendance/today?subject=${code}`)
-    .then(r=>r.json()).then(records=>{
-      const list = document.getElementById('live-list');
-      records.forEach(r=>{
-        if (!markedIds.has(r.student_id)) {
-          markedIds.add(r.student_id);
-          const initials = r.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
-          const li = document.createElement('li');
-          li.innerHTML = `
-            <div class="avatar">${initials}</div>
-            <div class="info">
-              <strong>${r.name}</strong>
-              <span>${r.student_id} &middot; ${r.time}</span>
-            </div>
-            <span class="badge badge-green" style="margin-left:auto">&#10003;</span>`;
-          list.prepend(li);
-        }
-      });
-      document.getElementById('count-badge').textContent = markedIds.size;
+  fetch('/api/attendance/today?subject=' + code)
+  .then(function(r) { return r.json(); })
+  .then(function(records) {
+    var list = document.getElementById('live-list');
+    records.forEach(function(r) {
+      if (!markedIds.has(r.student_id)) {
+        markedIds.add(r.student_id);
+        // Build initials avatar
+        var initials = r.name.split(' ')
+          .map(function(n) { return n[0]; })
+          .join('').slice(0, 2).toUpperCase();
+        var li = document.createElement('li');
+        li.style.cssText = 'list-style:none;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);background:var(--bg2);margin-bottom:6px;font-size:14px;border:1px solid var(--border);animation:slideIn .3s ease';
+        li.innerHTML =
+          '<div class="avatar">' + initials + '</div>' +
+          '<div class="info">' +
+            '<strong>' + r.name + '</strong>' +
+            '<span style="display:block;font-size:12px;color:var(--text-muted)">' +
+              r.student_id + ' &middot; ' + r.time +
+            '</span>' +
+          '</div>' +
+          '<span class="badge badge-green" style="margin-left:auto">&#10003;</span>';
+        list.prepend(li);
+      }
     });
+    document.getElementById('count-badge').textContent = markedIds.size;
+  })
+  .catch(function(err) { console.log('Poll error:', err); });
 }
 </script>
 {% endblock %}
