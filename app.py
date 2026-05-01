@@ -356,6 +356,14 @@ def export_csv():
                      mimetype="text/csv", as_attachment=True,
                      download_name=fname)
 
+def print_routes():
+    print("\nRegistered Flask Routes:")
+    print("-" * 40)
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(sorted(rule.methods))
+        print(f"{rule.endpoint:20s} {methods:20s} {rule}")
+    print("-" * 40)
+
 if __name__ == "__main__":
     print("="*50)
     print("  SMART ATTENDANCE — Subject-wise Mode")
@@ -363,4 +371,5 @@ if __name__ == "__main__":
     create_tables()
     print(f"[SETUP] Blink detection ON — {REQUIRED_BLINKS} blinks required")
     print("[SERVER] http://localhost:5000  |  admin / admin123\n")
+    print_routes()
     app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)
